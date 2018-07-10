@@ -28,211 +28,231 @@
 	</head>
 	<body>
 		<div id="info">
-			<a href="http://threejs.org" target="_blank" rel="noopener">three.js</a> webgl - exporter - stl
+			<!-- <a href="http://threejs.org" target="_blank" rel="noopener">three.js</a> webgl - exporter - stl -->
+		</div>
+		<div>
+			<input type="checkbox" name="stl" id="AntagonistScan" value="AntagonistScan" checked="checked" onclick="checkSTL('AntagonistScan')">AntagonistScan.stl<br />
+			<input type="checkbox" name="stl" id="PreparationScan" value="PreparationScan.stl" checked="checked" onclick="checkSTL('PreparationScan')">PreparationScan.stl<br />
+			<input type="checkbox" name="stl" id="80021_20180115_0934_Pearson_0" value="80021_20180115_0934_Pearson_0.stl" checked="checked"checked="checked" onclick="checkSTL('80021_20180115_0934_Pearson_0')">80021_20180115_0934_Pearson_0.stl<br />
+			<input type="checkbox" name="stl" id="80021_20180115_0934_Pearson_1" value="80021_20180115_0934_Pearson_1.stl" checked="checked" onclick="checkSTL('80021_20180115_0934_Pearson_1')">80021_20180115_0934_Pearson_1.stl<br />
 		</div>
 
 		<script src="js/three.js"></script>
 		<script src="js/controls/OrbitControls.js"></script>
-		<script src="js/exporters/STLExporter.js"></script>
+		<!-- <script src="js/exporters/STLExporter.js"></script> -->
 
 		<script src="js/Detector.js"></script>
-		<script src="js/libs/dat.gui.min.js"></script>
+		<!-- <script src="js/libs/dat.gui.min.js"></script> -->
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
 
 		<script>
 
 			if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
 
 			var scene, camera, renderer, exporter, mesh;
+			var meshMap = {};
 
 			init();
 			animate();
 
+			function checkSTL(name) {
+				console.log(name);
+				if($('input[id='+name+']').is(":checked")){
+				scene.add(meshMap[name])
+				}else{
+				scene.remove(meshMap[name])
+				}
+			}
+
 			function trim (str) {
-                str = str.replace(/^\s+/, '');
-                for (var i = str.length - 1; i >= 0; i--) {
-                    if (/\S/.test(str.charAt(i))) {
-                        str = str.substring(0, i + 1);
-                        break;
-                    }
-                }
-                return str;
-            }
+	        str = str.replace(/^\s+/, '');
+	        for (var i = str.length - 1; i >= 0; i--) {
+	            if (/\S/.test(str.charAt(i))) {
+	                str = str.substring(0, i + 1);
+	                break;
+	            }
+	        }
+	        return str;
+	    }
 
-            // Notes:
-            // - STL file format: http://en.wikipedia.org/wiki/STL_(file_format)
-            // - 80 byte unused header
-            // - All binary STLs are assumed to be little endian, as per wiki doc
-            var parseStlBinary = function(stl) {
-                var geo = new THREE.Geometry();
-                var dv = new DataView(stl, 80); // 80 == unused header
-                var isLittleEndian = true;
-                var triangles = dv.getUint32(0, isLittleEndian);
+      // Notes:
+      // - STL file format: http://en.wikipedia.org/wiki/STL_(file_format)
+      // - 80 byte unused header
+      // - All binary STLs are assumed to be little endian, as per wiki doc
+      var parseStlBinary = function(stl, stlColor, fileName) {
+          var geo = new THREE.Geometry();
+          var dv = new DataView(stl, 80); // 80 == unused header
+          var isLittleEndian = true;
+          var triangles = dv.getUint32(0, isLittleEndian);
 
-                // console.log('arraybuffer length:  ' + stl.byteLength);
-                // console.log('number of triangles: ' + triangles);
+          // console.log('arraybuffer length:  ' + stl.byteLength);
+          // console.log('number of triangles: ' + triangles);
 
-                var offset = 4;
-                for (var i = 0; i < triangles; i++) {
-                    // Get the normal for this triangle
-                    var normal = new THREE.Vector3(
-                        dv.getFloat32(offset, isLittleEndian),
-                        dv.getFloat32(offset+4, isLittleEndian),
-                        dv.getFloat32(offset+8, isLittleEndian)
-                    );
-                    offset += 12;
+          var offset = 4;
+          for (var i = 0; i < triangles; i++) {
+              // Get the normal for this triangle
+              var normal = new THREE.Vector3(
+                  dv.getFloat32(offset, isLittleEndian),
+                  dv.getFloat32(offset+4, isLittleEndian),
+                  dv.getFloat32(offset+8, isLittleEndian)
+              );
+              offset += 12;
 
-                    // Get all 3 vertices for this triangle
-                    for (var j = 0; j < 3; j++) {
-                        geo.vertices.push(
-                            new THREE.Vector3(
-                                dv.getFloat32(offset, isLittleEndian),
-                                dv.getFloat32(offset+4, isLittleEndian),
-                                dv.getFloat32(offset+8, isLittleEndian)
-                            )
-                        );
-                        offset += 12
-                    }
+              // Get all 3 vertices for this triangle
+              for (var j = 0; j < 3; j++) {
+                  geo.vertices.push(
+                      new THREE.Vector3(
+                          dv.getFloat32(offset, isLittleEndian),
+                          dv.getFloat32(offset+4, isLittleEndian),
+                          dv.getFloat32(offset+8, isLittleEndian)
+                      )
+                  );
+                  offset += 12
+              }
 
-                    // there's also a Uint16 "attribute byte count" that we
-                    // don't need, it should always be zero.
-                    offset += 2;
+              // there's also a Uint16 "attribute byte count" that we
+              // don't need, it should always be zero.
+              offset += 2;
 
-                    // Create a new face for from the vertices and the normal
-                    geo.faces.push(new THREE.Face3(i*3, i*3+1, i*3+2, normal));
-                }
+              // Create a new face for from the vertices and the normal
+              geo.faces.push(new THREE.Face3(i*3, i*3+1, i*3+2, normal));
+          }
 
-                // The binary STL I'm testing with seems to have all
-                // zeroes for the normals, unlike its ASCII counterpart.
-                // We can use three.js to compute the normals for us, though,
-                // once we've assembled our geometry. This is a relatively
-                // expensive operation, but only needs to be done once.
-                geo.computeFaceNormals();
+          // The binary STL I'm testing with seems to have all
+          // zeroes for the normals, unlike its ASCII counterpart.
+          // We can use three.js to compute the normals for us, though,
+          // once we've assembled our geometry. This is a relatively
+          // expensive operation, but only needs to be done once.
+          geo.computeFaceNormals();
 
-                mesh = new THREE.Mesh(
-                    geo,
-                    // new THREE.MeshNormalMaterial({
-                    //     overdraw:true
-                    // }
-                    new THREE.MeshLambertMaterial({
-                        overdraw:true,
-                        color: 0xaaaa00,
-                        shading: THREE.FlatShading
-                    }
-                ));
-                scene.add(mesh);
 
-                stl = null;
-            };
 
-            var parseStl = function(stl) {
-                var state = '';
-                var lines = stl.split('\n');
-                var geo = new THREE.Geometry();
-                var name, parts, line, normal, done, vertices = [];
-                var vCount = 0;
-                stl = null;
+          mesh = new THREE.Mesh(
+              geo,
+              // new THREE.MeshNormalMaterial({
+              //     overdraw:true
+              // }
+              new THREE.MeshLambertMaterial({
+                  overdraw:true,
+                  color: stlColor,
+                  shading: THREE.FlatShading
+              }
+          ));
 
-                for (var len = lines.length, i = 0; i < len; i++) {
-                    if (done) {
-                        break;
-                    }
-                    line = trim(lines[i]);
-                    parts = line.split(' ');
-                    switch (state) {
-                        case '':
-                            if (parts[0] !== 'solid') {
-                                console.error(line);
-                                console.error('Invalid state "' + parts[0] + '", should be "solid"');
-                                return;
-                            } else {
-                                name = parts[1];
-                                state = 'solid';
-                            }
-                            break;
-                        case 'solid':
-                            if (parts[0] !== 'facet' || parts[1] !== 'normal') {
-                                console.error(line);
-                                console.error('Invalid state "' + parts[0] + '", should be "facet normal"');
-                                return;
-                            } else {
-                                normal = [
-                                    parseFloat(parts[2]),
-                                    parseFloat(parts[3]),
-                                    parseFloat(parts[4])
-                                ];
-                                state = 'facet normal';
-                            }
-                            break;
-                        case 'facet normal':
-                            if (parts[0] !== 'outer' || parts[1] !== 'loop') {
-                                console.error(line);
-                                console.error('Invalid state "' + parts[0] + '", should be "outer loop"');
-                                return;
-                            } else {
-                                state = 'vertex';
-                            }
-                            break;
-                        case 'vertex':
-                            if (parts[0] === 'vertex') {
-                                geo.vertices.push(new THREE.Vector3(
-                                    parseFloat(parts[1]),
-                                    parseFloat(parts[2]),
-                                    parseFloat(parts[3])
-                                ));
-                            } else if (parts[0] === 'endloop') {
-                                geo.faces.push( new THREE.Face3( vCount*3, vCount*3+1, vCount*3+2, new THREE.Vector3(normal[0], normal[1], normal[2]) ) );
-                                vCount++;
-                                state = 'endloop';
-                            } else {
-                                console.error(line);
-                                console.error('Invalid state "' + parts[0] + '", should be "vertex" or "endloop"');
-                                return;
-                            }
-                            break;
-                        case 'endloop':
-                            if (parts[0] !== 'endfacet') {
-                                console.error(line);
-                                console.error('Invalid state "' + parts[0] + '", should be "endfacet"');
-                                return;
-                            } else {
-                                state = 'endfacet';
-                            }
-                            break;
-                        case 'endfacet':
-                            if (parts[0] === 'endsolid') {
-                                //mesh = new THREE.Mesh( geo, new THREE.MeshNormalMaterial({overdraw:true}));
-                                mesh = new THREE.Mesh(
-                                    geo,
-                                    new THREE.MeshLambertMaterial({
-                                        overdraw:true,
-                                        color: 0xaaaa00,
-                                        shading: THREE.FlatShading
-                                    }
-                                ));
-                                scene.add(mesh);
-                                done = true;
-                            } else if (parts[0] === 'facet' && parts[1] === 'normal') {
-                                normal = [
-                                    parseFloat(parts[2]),
-                                    parseFloat(parts[3]),
-                                    parseFloat(parts[4])
-                                ];
-                                if (vCount % 1000 === 0) {
-                                    console.log(normal);
-                                }
-                                state = 'facet normal';
-                            } else {
-                                console.error(line);
-                                console.error('Invalid state "' + parts[0] + '", should be "endsolid" or "facet normal"');
-                                return;
-                            }
-                            break;
-                        default:
-                            console.error('Invalid state "' + state + '"');
-                            break;
-                    }
-                }
-            };
+					scene.add(mesh);
+          stl = null;
+					return mesh;
+      };
+
+      // var parseStl = function(stl) {
+      //     var state = '';
+      //     var lines = stl.split('\n');
+      //     var geo = new THREE.Geometry();
+      //     var name, parts, line, normal, done, vertices = [];
+      //     var vCount = 0;
+      //     stl = null;
+			//
+      //     for (var len = lines.length, i = 0; i < len; i++) {
+      //         if (done) {
+      //             break;
+      //         }
+      //         line = trim(lines[i]);
+      //         parts = line.split(' ');
+      //         switch (state) {
+      //             case '':
+      //                 if (parts[0] !== 'solid') {
+      //                     console.error(line);
+      //                     console.error('Invalid state "' + parts[0] + '", should be "solid"');
+      //                     return;
+      //                 } else {
+      //                     name = parts[1];
+      //                     state = 'solid';
+      //                 }
+      //                 break;
+      //             case 'solid':
+      //                 if (parts[0] !== 'facet' || parts[1] !== 'normal') {
+      //                     console.error(line);
+      //                     console.error('Invalid state "' + parts[0] + '", should be "facet normal"');
+      //                     return;
+      //                 } else {
+      //                     normal = [
+      //                         parseFloat(parts[2]),
+      //                         parseFloat(parts[3]),
+      //                         parseFloat(parts[4])
+      //                     ];
+      //                     state = 'facet normal';
+      //                 }
+      //                 break;
+      //             case 'facet normal':
+      //                 if (parts[0] !== 'outer' || parts[1] !== 'loop') {
+      //                     console.error(line);
+      //                     console.error('Invalid state "' + parts[0] + '", should be "outer loop"');
+      //                     return;
+      //                 } else {
+      //                     state = 'vertex';
+      //                 }
+      //                 break;
+      //             case 'vertex':
+      //                 if (parts[0] === 'vertex') {
+      //                     geo.vertices.push(new THREE.Vector3(
+      //                         parseFloat(parts[1]),
+      //                         parseFloat(parts[2]),
+      //                         parseFloat(parts[3])
+      //                     ));
+      //                 } else if (parts[0] === 'endloop') {
+      //                     geo.faces.push( new THREE.Face3( vCount*3, vCount*3+1, vCount*3+2, new THREE.Vector3(normal[0], normal[1], normal[2]) ) );
+      //                     vCount++;
+      //                     state = 'endloop';
+      //                 } else {
+      //                     console.error(line);
+      //                     console.error('Invalid state "' + parts[0] + '", should be "vertex" or "endloop"');
+      //                     return;
+      //                 }
+      //                 break;
+      //             case 'endloop':
+      //                 if (parts[0] !== 'endfacet') {
+      //                     console.error(line);
+      //                     console.error('Invalid state "' + parts[0] + '", should be "endfacet"');
+      //                     return;
+      //                 } else {
+      //                     state = 'endfacet';
+      //                 }
+      //                 break;
+      //             case 'endfacet':
+      //                 if (parts[0] === 'endsolid') {
+      //                     //mesh = new THREE.Mesh( geo, new THREE.MeshNormalMaterial({overdraw:true}));
+      //                     mesh = new THREE.Mesh(
+      //                         geo,
+      //                         new THREE.MeshLambertMaterial({
+      //                             overdraw:true,
+      //                             color: 0xaaaa00,
+      //                             shading: THREE.FlatShading
+      //                         }
+      //                     ));
+      //                     scene.add(mesh);
+      //                     done = true;
+      //                 } else if (parts[0] === 'facet' && parts[1] === 'normal') {
+      //                     normal = [
+      //                         parseFloat(parts[2]),
+      //                         parseFloat(parts[3]),
+      //                         parseFloat(parts[4])
+      //                     ];
+      //                     if (vCount % 1000 === 0) {
+      //                         console.log(normal);
+      //                     }
+      //                     state = 'facet normal';
+      //                 } else {
+      //                     console.error(line);
+      //                     console.error('Invalid state "' + parts[0] + '", should be "endsolid" or "facet normal"');
+      //                     return;
+      //                 }
+      //                 break;
+      //             default:
+      //                 console.error('Invalid state "' + state + '"');
+      //                 break;
+      //         }
+      //     }
+      // };
 
 			// STL
 
@@ -246,7 +266,7 @@
 				scene.background = new THREE.Color( 0xa0a0a0 );
 				scene.fog = new THREE.Fog( 0xa0a0a0, 200, 1000 );
 
-				exporter = new THREE.STLExporter();
+				// exporter = new THREE.STLExporter();
 
 				//
 
@@ -291,34 +311,20 @@
 				// mesh.position.y = 25;
 				// scene.add( mesh );
 
-				//aaa
-				var xhr = new XMLHttpRequest();
-                xhr.onreadystatechange = function () {
-                    if ( xhr.readyState == 4 ) {
-                        if ( xhr.status == 200 || xhr.status == 0 ) {
-                            var rep = xhr.response; // || xhr.mozResponseArrayBuffer;
-                            console.log(rep);
-                            parseStlBinary(rep);
-                            //parseStl(xhr.responseText);
-                            mesh.rotation.x = 5;
-                            mesh.rotation.z = .25;
-                            console.log('done parsing');
-                        }
-                    }
-                }
+				var xml = '';
+				var color = [0x003366, 0x006666, 0x669999, 0x339966, 0x339933, 0x006600, 0x003300, 0x336600, 0x333300, 0x666633,
+									0x999966, 0x663300, 0x996600, 0xcc3300, 0x993300, 0x990000, 0x993333, 0x993399, 0x660066, 0x9900cc,
+									0x6600cc, 0x666699, 0x333399, 0x000066, 0x000099, 0x003399, 0x3366cc, 0x336699, 0x003366, 0x9966ff
+								];
 
-				xhr.open( "GET", 'stone.stl', true );
-                xhr.responseType = "arraybuffer";
-                //xhr.setRequestHeader("Accept","text/plain");
-                //xhr.setRequestHeader("Content-Type","text/plain");
-                //xhr.setRequestHeader('charset', 'x-user-defined');
-                xhr.send( null );
+				var filePath = [ "PortalSite/AntagonistScan.stl", "PortalSite/PreparationScan.stl", "PortalSite/80021_20180115_0934_Pearson_1.stl", "PortalSite/80021_20180115_0934_Pearson_0.stl" ];
+				var fileName = [ "AntagonistScan", "PreparationScan", "80021_20180115_0934_Pearson_1", "80021_20180115_0934_Pearson_0"];
 
+				for(var a = 0 ; filePath.length > a ; a++){
 
-				//zzz
+						xmlOpen(fileName[a], filePath[a], "xml"+a, color[a]);
+				}
 
-
-				//
 
 				renderer = new THREE.WebGLRenderer( { antialias: true } );
 				renderer.setPixelRatio( window.devicePixelRatio );
@@ -342,7 +348,7 @@
 				// 		exportBinary();
 				// 	}
 				// }
-
+				//
 				// var gui = new dat.GUI();
 				// var folder = gui.addFolder( 'Export' );
 				//
@@ -353,6 +359,39 @@
 				//
 
 				window.addEventListener( 'resize', onWindowResize, false );
+
+			}
+
+			function xmlOpen(fileName, filePath, xhr, color) {
+
+				xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = function () {
+            if ( xhr.readyState == 4 ) {
+                if ( xhr.status == 200 || xhr.status == 0 ) {
+                    var rep = xhr.response; // || xhr.mozResponseArrayBuffer;
+                    // console.log(rep);
+                    var mesh = parseStlBinary(rep, color, fileName);
+										meshMap[fileName] = mesh;
+
+                    mesh.rotation.x = 5;
+                    mesh.rotation.z = .25;
+                    // console.log('done parsing');
+                }
+            }
+        }
+
+				// xhr.open( "GET", 'stone.stl', true );
+				// xhr.open( "GET", 'PortalSite/80021_20180115_0934_Pearson_0.stl', true );
+				// xhr.open( "GET", 'PortalSite/80021_20180115_0934_Pearson_1.stl', true );
+				// xhr.open( "GET", 'PortalSite/AntagonistScan.stl', true );
+				// xhr.open( "GET", 'PortalSite/PreparationScan.stl', true );
+
+				xhr.open( "GET", filePath, true );
+        xhr.responseType = "arraybuffer";
+        //xhr.setRequestHeader("Accept","text/plain");
+        //xhr.setRequestHeader("Content-Type","text/plain");
+        //xhr.setRequestHeader('charset', 'x-user-defined');
+        xhr.send( null );
 
 			}
 
